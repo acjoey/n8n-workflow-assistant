@@ -1,10 +1,10 @@
 ---
 name: n8n-workflow-assistant
-description: "n8n 工作流自动化设计助手。帮助用户设计、创建、验证和优化 n8n 工作流。使用 n8n-MCP 与 n8n 实例交互，使用 n8n-skills 知识库查找节点和参考配置。适用场景：创建新工作流、分析需求并选择合适节点、验证工作流配置、优化现有工作流性能。关键词：n8n, workflow, automation, 工作流设计, 自动化。"
+description: "n8n 工作流自动化设计助手。帮助用户设计、创建、验证和优化 n8n 工作流。使用 n8n-MCP 与 n8n 实例交互，使用 n8n-skills 知识库查找节点和参考配置。支持浏览器自动化部署和节点兼容性检查。关键词：n8n, workflow, automation, 工作流设计, 自动化。"
 license: MIT
 metadata:
   author: 阿豪
-  version: "0.1.0"
+  version: "0.2.0"
 ---
 
 # n8n Workflow Assistant
@@ -13,12 +13,13 @@ metadata:
 
 ## 技术栈
 
-本 Skill 依赖两个核心组件：
+本 Skill 依赖以下核心组件：
 
 | 组件 | 定位 | 说明 |
 |------|------|------|
 | **n8n-MCP** | 实时操作引擎 | 通过 MCP 工具与 n8n 实例交互 |
 | **n8n-skills** | 离线知识库 | 545 个节点文档 + 30 个社区包 + 20+ 模板 |
+| **Browser Agent** | 浏览器自动化 | 直接在 n8n Web UI 中创建工作流 |
 
 ## 核心能力
 
@@ -43,7 +44,24 @@ metadata:
 | 版本管理 | `n8n_workflow_versions` | 版本历史和回滚 |
 | 自动修复 | `n8n_autofix_workflow` | 自动修复常见问题 |
 
+### 浏览器自动化（无需 API Key）
+
+| 功能 | 工具 | 说明 |
+|------|------|------|
+| 浏览器部署 | `browser_subagent` | 打开 n8n 并导入工作流 |
+| UI 验证 | `browser_subagent` | 验证节点正确显示 |
+| 社区节点安装 | `browser_subagent` | 安装缺失的社区节点 |
+
+---
+
 ## 工作流程
+
+```
+┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐
+│ 1.需求  │──▶│ 2.节点  │──▶│ 3.设计  │──▶│ 4.兼容  │──▶│ 5.部署  │
+│  澄清   │   │  选择   │   │  验证   │   │  检查   │   │  测试   │
+└─────────┘   └─────────┘   └─────────┘   └─────────┘   └─────────┘
+```
 
 ### 阶段 1：需求澄清
 
@@ -68,12 +86,12 @@ metadata:
 
 | 场景 | 推荐节点 |
 |------|----------|
-| HTTP 请求 | `nodes-base.httpRequest` |
-| 定时触发 | `nodes-base.scheduleTrigger` |
-| Webhook | `nodes-base.webhook` |
-| 数据转换 | `nodes-base.set`, `nodes-base.code` |
-| 条件判断 | `nodes-base.if`, `nodes-base.switch` |
-| AI 处理 | `nodes-langchain.agent`, `nodes-base.openAi` |
+| HTTP 请求 | `n8n-nodes-base.httpRequest` |
+| 定时触发 | `n8n-nodes-base.scheduleTrigger` |
+| Webhook | `n8n-nodes-base.webhook` |
+| 数据转换 | `n8n-nodes-base.set`, `n8n-nodes-base.code` |
+| 条件判断 | `n8n-nodes-base.if`, `n8n-nodes-base.switch` |
+| AI 处理 | `@n8n/n8n-nodes-langchain.openAi` |
 
 ### 阶段 3：工作流设计
 
@@ -88,14 +106,52 @@ metadata:
 
 > ⚠️ **永远不要信任默认值** - 默认参数是运行时失败的首要原因，必须显式配置所有参数。
 
-### 阶段 4：部署和测试
+### 阶段 4：兼容性检查 ⭐ 新增
 
-**需要配置 n8n API Key：**
+**在创建工作流前必须执行：**
+
+1. **节点类型名称检查**
+   - 确保使用正确的 `type` 格式
+   - 核心节点：`n8n-nodes-base.xxx`
+   - Langchain 节点：`@n8n/n8n-nodes-langchain.xxx`
+
+2. **typeVersion 检查**
+   - 使用 `get_node` 获取最新版本号
+   - HTTP Request 推荐 `4.4`
+   - OpenAI 推荐 `2.1`
+
+3. **社区节点检查**
+   - 识别需要安装的社区节点包
+   - 提供安装命令
+
+> 📖 详细指南参考：`references/node_compatibility.md`
+
+### 阶段 5：部署和测试 ⭐ 增强
+
+**方式 A：浏览器自动化部署（推荐）**
+
+使用 `browser_subagent` 工具：
+
+1. 打开浏览器访问 n8n 实例
+2. 登录（如需要）
+3. 创建新工作流
+4. 导入 JSON 或逐个添加节点
+5. 验证所有节点正确显示（无 `?` 标记）
+6. 如有问题，安装缺失的社区节点
+7. 保存并激活工作流
+
+> 📖 详细指南参考：`references/browser_deployment.md`
+
+**方式 B：API 部署**
+
+需要配置 n8n API Key：
 
 1. `n8n_create_workflow` - 创建工作流
 2. `n8n_test_workflow` - 测试执行
 3. 检查执行结果
 4. 如有问题，用 `n8n_autofix_workflow` 尝试自动修复
+
+---
 
 ## 参考资源
 
@@ -109,11 +165,23 @@ metadata:
 | 使用指南 | `resources/guides/usage-guide.md` | 节点使用方法 |
 | 模板参考 | `resources/templates/` | 工作流模板示例 |
 
+### Skill 参考文档
+
+| 文档 | 路径 | 用途 |
+|------|------|------|
+| 需求问题库 | `references/requirement_questions.md` | 需求澄清问题 |
+| 工作流模式 | `references/workflow_patterns.md` | 常见设计模式 |
+| MCP 工具指南 | `references/mcp_tools_guide.md` | MCP 工具使用 |
+| **浏览器部署** | `references/browser_deployment.md` | 浏览器自动化 |
+| **节点兼容性** | `references/node_compatibility.md` | 兼容性检查 |
+
 ### 节点查找技巧
 
 1. **按功能搜索**：`search_nodes({query: "email"})`
 2. **按分类浏览**：查看 n8n-skills 的 INDEX.md
 3. **带示例搜索**：`search_nodes({query: "slack", includeExamples: true})`
+
+---
 
 ## 安全警告
 
@@ -122,6 +190,8 @@ metadata:
 > 1. **不使用删除功能** - `n8n_delete_workflow` 工具不会被使用
 > 2. **版本优先** - 修改前先查看版本历史
 > 3. **测试先行** - 重大修改先在测试环境验证
+
+---
 
 ## 运行模式
 
